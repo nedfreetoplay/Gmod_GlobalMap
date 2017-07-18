@@ -1,17 +1,3 @@
---   Copyright 2017 JustNeed
---
---   Licensed under the Apache License, Version 2.0 (the "License");
---   you may not use this file except in compliance with the License.
---   You may obtain a copy of the License at
---
---       http://www.apache.org/licenses/LICENSE-2.0
---
---   Unless required by applicable law or agreed to in writing, software
---   distributed under the License is distributed on an "AS IS" BASIS,
---   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
---   See the License for the specific language governing permissions and
---   limitations under the License.
-
 AddCSLuaFile()
 
 --[[
@@ -80,6 +66,52 @@ function GetPlayersPos()
 	end
 
 	return pos
+end
+
+function Settings( ... )
+
+	if #arg < 4 or type( arg[4] ) ~= "table" then 
+		Error("Usage: Settings( Panel parent, int xPos, int yPos, table Element1,table Element2, table Element3...)
+		\nReturns: table settings
+		\n<Elements> structure:
+		\n<Label>: { \"DLabel\", string text }
+		\n<NumSlider>: { \"DNumSlider\", int xSize, string text, int min, int max, int decimals}
+		\n<NextElement>: { \"DNextElement\", ...}")
+	end
+
+	local function DerLabel( xPos, yPos, text)
+		local DLabel = vgui.Create( "DLabel", arg[1] )
+		DLabel:SetPos( xPos, yPos )
+		DLabel:SetText( text )
+
+		return DLabel
+	end
+
+	local function DerNumSlider( xPos, yPos, xSize, ySize, text, min, max, decimals )
+		local DNumSlider = vgui.Create( "DNumSlider", arg[1] )
+		DNumSlider:SetPos( xPos, yPos )
+		DNumSlider:SetSize( xSize, ySize )
+		DNumSlider:SetText( text )
+		DNumSlider:SetMinMax( min, max )
+		DNumSlider:SetDecimals( decimals )
+
+		return DNumSlider
+	end
+
+	local function DrawMenu()
+		
+		local ind = 30
+		local xPos, yPos = arg[2], arg[3]
+		local obj = {}
+
+		for k,v in pairs(arg) do
+			local elem = v[k + 3]
+
+			if elem[1] == "DLabel" then obj[k] = DerLabel( xPos, yPos + ind * k, elem[2] )
+			elseif elem[1] == "DNumSlider" then obj[k] = DerNumSlider( xPos, yPos + ind * k, elem[2], yPos + ind * k, elem[3], elem[4], elem[5], elem[6]) end
+		end
+		return obj
+	end
 end
 
 function OpenMap( indent, sett )
