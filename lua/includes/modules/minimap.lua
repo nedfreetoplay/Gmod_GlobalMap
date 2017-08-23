@@ -1,47 +1,163 @@
 AddCSLuaFile()
 
---[[
-f LoadSettings()
-f SaveSettings( settings )
-f DrawPlayer( panel, ply, size, global )
-f GetPlayersPos()
-f OpenMap( indent, settings )
-]]
+---------------------------------Constants---------------------------------
 
---[[
-	Name: LoadSettings
-	Desc: Загружает файл и помещает информацию из его в массив.
-	Return: Table settings
-]]
-function LoadSettings()
+local Minimap = {}
+
+---------------------------------Variables---------------------------------
+
+local isSettingsOpen = false
+local isMinimapOpen = false
+
+---------------------------------Methods---------------------------------
+
+function Minimap:isOpen()
+
+	return isMinimapOpen
+
+end
+
+function Minimap:Close()
+
+		if isMinimapOpen then
+			Window:Close()
+		end
+
+end
+
+function Minimap:Create( settings )
+
+	local indent = 20
+	local windowSize = ScrH() - indent*2
+	local Settings = settings
+
+	--
+	--Create the window
+	--
+	local Window = vgui.Create( "DFrame" )
+	Window:SetSize( mapSize, mapSize )
+	Window:Center()
+	Window:SetBackgroundBlur( Settings.backgroundBlur )
+	Window:SetDraggable(false)
+	Window:MakePopup()
+
+	--
+	--Create the image map
+	--
+	Image = vgui.Create( "DPanel", Window )
+	Image:SetSize( mapSize - 8, mapSize - 31 )
+	Image:SetPos( 4, 27 )
+
+	--
+	--Create the button settings
+	--
+	ButtonSettings = vgui.Create( "DButton", Window )
+	ButtonSettings:SetPos( 2, 2 )
+	ButtonSettings:SetSize( 90, 20 )
+	ButtonSettings:SetText( "Настройки" )
+
+	function ButtonSettings:DoClick()
+
+		ButtonSettings:SetEnabled ( false )
+		isSettingsOpen = true
+
+		local WindowSettings = vgui.Create( "DFrame", Image )
+		WindowSettings:SetSize( 300, 30 * 4 )
+		WindowSettings:Center()
+		WindowSettings:SetText( "Окно настроек" )
+
+		local PlayerSize = vgui.Create( "DNumSlider", WindowSettings )
+		PlayerSize:SetPos( 5, 10 )
+		PlayerSize:SetSize( 200, 30 )
+		PlayerSize:SetMinMax( 1, 20 )
+		PlayerSize:SetValue( Settings["playerSize"] )
+		PlayerSize:SetDecimals( 0 )
+
+		local BackgroundBlur = vgui.Create( "DCheckBoxLabel", WindowSettings )
+		BackgroundBlur:SetParent( DermaPanel )
+		BackgroundBlur:SetPos( 25, 40 )
+		BackgroundBlur:SetText( "Background Blur" )
+		BackgroundBlur:SetValue( Settings["backgroundBlur"] )
+		BackgroundBlur:SizeToContents()	
+
+		local SaveSettings = vgui.Create( "DButton", WindowSettings )
+		SaveSettings:SetPos( 5, 70 )
+		SaveSettings:SetSize( 200, 30 )
+		SaveSettings:SetText( "Применить" )
+
+		function SaveSettings:DoClick()
+
+			Settings["playerSize"] = PlayerSize:GetValue()
+			Settings["backgroundBlur"] = BackgroundBlur:GetChecked()
+			WindowSettings:Remove()
+
+			SaveSettings( Settings )
+
+		end
+
+		function WindowSettings:OnClose()
+
+			ButtonSettings:SetEnabled( true )
+			isSettingsOpen = false
+
+		end
+
+	end
+
+	function Image:Paint( w, h )
+
+		local mapPoly = {
+			{ x = 0,           y = 0,            u = 0, v = 0 },
+			{ x = mapSize - 8, y = 0,            u = 1, v = 0 },
+			{ x = mapSize - 8, y = mapSize - 31, u = 1, v = 1 },
+			{ x = 0,           y = mapSize - 31, u = 0, v = 1 }
+		}
+
+		surface.SetDrawColor( color_white )
+		surface.SetMaterial( Material( "vgui/rp_rockfordmap.png", "noclamp" ) )
+		surface.DrawPoly( mapPoly )
+
+	end
+
+	function Window:OnClose()
+
+		isMinimapOpen = false
+
+		if isSettingsOpen then
+			sMain:Close()
+		end
+
+	end
+
+end
+
+---------------------------------local Methods---------------------------------
+
+local function LoadSettings()
+
 	local defaultSettings = {
 		playerSize = 10,
 		showPlayers = 0,
-		backGroundBlur = true,
+		backgroundBlur = true,
 		sizeMap = 15216
 	}
+
 	if ( file.IsDir( "minimap.dat", "DATA" ) ) then
 		return util.JSONToTable( file.Read( "minimap.dat", "DATA" ) )
 	else
 		return defaultSettings
 	end
+
 end
 
---[[
-	Name: SaveSettings
-	Desc: Сохраняет настройки карты в файл.
-	Parm: Table settings
-]]
-function SaveSettings( settings )
-	file.Write( "minimap.dat", util.TableToJSON( settings ) )
+local function SaveSettings( s )
+
+	file.Write( "minimap.dat", util.TableToJSON( s ) )
+
 end
 
+local function DrawPlayer( panel, ply, size, global )
 
---[[
-	Name: DrawPlayer
-	Desc: Служит для отрисовки игрока на карте в его местоположение и возвращает панель.
-]]
-function DrawPlayer( panel, ply, size, global )
 	local sX, sY = panel:GetSize()
 	local player = vgui.Create( "DButton", panel )
 	local x = (sX / 2) + ply["x"]/global*sX/2
@@ -50,152 +166,21 @@ function DrawPlayer( panel, ply, size, global )
 	player:SetPos( ply["x"] - size/2, ply["y"] - size/2 )
 	player:SetSize( size, size )
 	return player
+
 end
 
---[[
-Выдаёт массив, содержащий информацию о имени игрока и его координаты.
-]]
-function GetPlayersPos() 
+local function GetPlayersPos( p ) -- player.GetAll()
+
 	local pos = {}
 
-	for k,v in pairs( player.GetAll() ) do
+	for k,v in pairs( p ) do
 		pos[k] = {}
-		pos[k]["name"] = v:GetName()
-		pos[k]["x"] = math.floor( v:GetPos().x )
-		pos[k]["y"] = math.floor( v:GetPos().y )
+		pos[k].name = v:GetName()
+		pos[k].x = math.floor( v:GetPos().x )
+		pos[k].y = math.floor( v:GetPos().y )
+		pos[k].z = math.floor( v:GetPos().z )
 	end
 
 	return pos
-end
 
-function Settings( ... )
-
-	if #arg < 4 or type( arg[4] ) ~= "table" then 
-		Error("Usage: Settings( Panel parent, int xPos, int yPos, table Element1,table Element2, table Element3...)
-		\nReturns: table settings
-		\n<Elements> structure:
-		\n<Label>: { \"DLabel\", string text }
-		\n<NumSlider>: { \"DNumSlider\", int xSize, string text, int min, int max, int decimals}
-		\n<NextElement>: { \"DNextElement\", ...}")
-	end
-
-	local function DerLabel( xPos, yPos, text)
-		local DLabel = vgui.Create( "DLabel", arg[1] )
-		DLabel:SetPos( xPos, yPos )
-		DLabel:SetText( text )
-
-		return DLabel
-	end
-
-	local function DerNumSlider( xPos, yPos, xSize, ySize, text, min, max, decimals )
-		local DNumSlider = vgui.Create( "DNumSlider", arg[1] )
-		DNumSlider:SetPos( xPos, yPos )
-		DNumSlider:SetSize( xSize, ySize )
-		DNumSlider:SetText( text )
-		DNumSlider:SetMinMax( min, max )
-		DNumSlider:SetDecimals( decimals )
-
-		return DNumSlider
-	end
-
-	local function DrawMenu()
-		
-		local ind = 30
-		local xPos, yPos = arg[2], arg[3]
-		local obj = {}
-
-		for k,v in pairs(arg) do
-			local elem = v[k + 3]
-
-			if elem[1] == "DLabel" then obj[k] = DerLabel( xPos, yPos + ind * k, elem[2] )
-			elseif elem[1] == "DNumSlider" then obj[k] = DerNumSlider( xPos, yPos + ind * k, elem[2], yPos + ind * k, elem[3], elem[4], elem[5], elem[6]) end
-		end
-		return obj
-	end
-end
-
-function OpenMap( indent, sett )
-	local mapSize = ScrH() - indent*2
-	local isSettingsOpen = false
-	local sMain
-
-	local main = vgui.Create( "DFrame" )
-	main:SetSize( mapSize, mapSize )
-	main:Center()
-	main:SetBackgroundBlur( true )
-	main:SetTitle( "MiniMap" )
-	main:SetIcon( "icon16/world.png" )
-	main:SetDraggable(false)
-	main:MakePopup()
-
-	local settings = vgui.Create( "DButton", main )
-	settings:SetPos( 2, 2 )
-	settings:SetSize( 90, 20 )
-	settings:SetText( "Настройки" )
-
-	local map = vgui.Create( "DPanel", main )
-	map:SetSize( mapSize - 8, mapSize - 31 )
-	map:SetPos( 4, 27 )
-
-	settings.DoClick = function()
-		settings:SetEnabled ( false )
-		isSettingsOpen = true
-		local yDis = 50
-
-		sMain = vgui.Create( "DFrame" )
-		sMain:SetPos( 5, 5 )
-		sMain:SetSize( 400, 400 )
-		sMain:SetDraggable(false)
-		sMain:Center()
-		sMain:MakePopup()
-
-		local xSize, ySize = sMain:GetSize()
-		local bgPlane = vgui.Create( "DPanel", sMain )
-		bgPlane:SetPos( 5, 27 )
-		bgPlane:SetSize( xSize - 10, ySize - 32 )
-
-		local playerSize = vgui.Create( "DNumSlider", bgPlane )
-		playerSize:SetText( "Размер игрока" )
-		playerSize:SetPos( 5, 5 )
-		playerSize:SetSize( 300, 100 )
-		playerSize:SetMin( 1 )
-		playerSize:SetMax( 20 )
-		playerSize:SetDecimals( 0 )
-		playerSize:SetValue( sett["playerSize"] )
-
-		plyExample = vgui.Create( "DButton", bgPlane )
-		plyExample:SetText( "" )
-		plyExample:SetPos( 400, 5 )
-		plyExample:SetSize( sett["playerSize"], sett["playerSize"] )
-
-		function playerSize:OnValueChanged( v )
-			v = math.Round( v )
-			plyExample:SetSize( v, v )
-			print( "playerSize changed to "..v )
-		end
-
-
-		function sMain:OnClose()
-			settings:SetEnabled( true )
-			isSettingsOpen = false
-		end
-	end
-
-	function map:Paint( w, h )
-		local mapPoly = {
-			{ x = 0, 		   y = 0, 			 u = 0, v = 0 },
-			{ x = mapSize - 8, y = 0, 			 u = 1, v = 0 },
-			{ x = mapSize - 8, y = mapSize - 31, u = 1, v = 1 },
-			{ x = 0, 		   y = mapSize - 31, u = 0, v = 1 }
-		}
-		surface.SetDrawColor( color_white )
-		surface.SetMaterial( Material( "vgui/rp_rockfordmap.png", "noclamp" ) )
-		surface.DrawPoly( mapPoly )
-	end
-
-	function main:OnClose()
-		if isSettingsOpen then
-			sMain:Close()
-		end
-	end
 end
